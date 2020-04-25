@@ -29,10 +29,19 @@ def conv_nested(image, kernel):
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    image_pad = np.zeros([Hi + Hk - 1, Wi + Wk - 1])
+    pad_H = (Hk - 1) // 2
+    pad_W = (Wk - 1) // 2
+    image_pad[pad_H:(Hi + pad_H), pad_W:(Wi + pad_W)] = image
+    for m in range(Hi):
+        for n in range(Wi):
+            for i in range(Hk):
+                for j in range(Wk):
+                    out[m, n] += kernel[i, j] * image_pad[2 * pad_H + m - i, 2 * pad_W + n - j]
     ### END YOUR CODE
 
     return out
+
 
 def zero_pad(image, pad_height, pad_width):
     """ Zero-pad an image.
@@ -56,7 +65,8 @@ def zero_pad(image, pad_height, pad_width):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = np.zeros([2 * pad_height + H, 2 * pad_width + W])
+    out[pad_height:(pad_height + H), pad_width: (pad_width + W)] = image
     ### END YOUR CODE
     return out
 
@@ -85,10 +95,18 @@ def conv_fast(image, kernel):
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    H_pad = (Hk - 1) // 2
+    W_pad = (Wk - 1) // 2
+    img_pad = zero_pad(image, H_pad, W_pad)
+    kernel = np.flip(kernel, 0)
+    kernel = np.flip(kernel, 1)
+    for i in range(Hi):
+        for j in range(Wi):
+            out[i, j] = np.sum(kernel * img_pad[i:i + Hk, j:j + Wk])
     ### END YOUR CODE
 
     return out
+
 
 def conv_faster(image, kernel):
     """
@@ -104,10 +122,25 @@ def conv_faster(image, kernel):
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.flip(kernel, 0)
+    kernel = np.flip(kernel, 1)
+    pad_H = (Hk - 1) // 2
+    pad_W = (Wk - 1) // 2
+    img = np.pad(image, [(pad_H, pad_H), (pad_W, pad_W)], 'constant')
+    col = np.zeros((Hk, Wk, Hi, Wi))
+    for y in range(Hk):
+        y_max = y + Hi
+        for x in range(Wk):
+            x_max = x + Wi
+            col[y, x, :, :] = img[y:y_max, x:x_max]
+    col = col.reshape(Hk * Wk, -1)
+    col_kernel = kernel.reshape(-1)
+    out = np.dot(col.T, col_kernel).reshape(Hi, -1)
+
     ### END YOUR CODE
 
     return out
+
 
 def cross_correlation(f, g):
     """ Cross-correlation of f and g.
@@ -124,10 +157,16 @@ def cross_correlation(f, g):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    h,w=g.shape
+    # if h % 2 ==1:
+    #     g=np.pad(g,[(0,0),(1,0)],'constant')
+    # if w % 2 == 1:
+    #     g = np.pad(g, [(1, 0), (0, 0)], 'constant')
+    out = conv_faster(f, g)
     ### END YOUR CODE
 
     return out
+
 
 def zero_mean_cross_correlation(f, g):
     """ Zero-mean cross-correlation of f and g.
@@ -150,6 +189,7 @@ def zero_mean_cross_correlation(f, g):
     ### END YOUR CODE
 
     return out
+
 
 def normalized_cross_correlation(f, g):
     """ Normalized cross-correlation of f and g.

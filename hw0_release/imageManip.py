@@ -22,6 +22,7 @@ def load(image_path):
     # Use skimage io.imread
     pass
     ### END YOUR CODE
+    out=io.imread(image_path)
 
     # Let's convert the image to be between the correct range.
     out = out.astype(np.float64) / 255
@@ -45,7 +46,7 @@ def dim_image(image):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out=0.5*image*image
     ### END YOUR CODE
 
     return out
@@ -66,7 +67,7 @@ def convert_to_grey_scale(image):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out=color.rgb2grey(image)
     ### END YOUR CODE
 
     return out
@@ -86,7 +87,9 @@ def rgb_exclusion(image, channel):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    a={'R':[1,2],'G':[0,2],'B':[0,1]}
+    out=np.zeros(image.shape)
+    out[:,:,a[channel]]=image[:,:,a[channel]]
     ### END YOUR CODE
 
     return out
@@ -107,7 +110,9 @@ def lab_decomposition(image, channel):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    a={'L':[1,2],'A':[0,2],'B':[0,1]}
+    out=np.zeros(image.shape)
+    out[:,:,a[channel]]=image[:,:,a[channel]]
     ### END YOUR CODE
 
     return out
@@ -128,7 +133,9 @@ def hsv_decomposition(image, channel='H'):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    a={'H':[1,2],'S':[0,2],'V':[0,1]}
+    out=np.zeros(image.shape)
+    out[:,:,a[channel]]=image[:,:,a[channel]]
     ### END YOUR CODE
 
     return out
@@ -154,7 +161,9 @@ def mix_images(image1, image2, channel1, channel2):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    img1=rgb_exclusion(image1,channel1)
+    img2=rgb_exclusion(image2,channel2)
+    out=np.concatenate((img1,img2),axis=1)
     ### END YOUR CODE
 
     return out
@@ -183,7 +192,16 @@ def mix_quadrants(image):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    H_half=np.floor(image. shape[0]/2). astype(np. uint8)
+    W_half=np.floor(image. shape[1]/2). astype(np. uint8)
+    a=rgb_exclusion(image[0:H_half,0:W_half,...],'R')
+    b=dim_image(image[0:H_half,W_half:W_half*2,...])
+    c=pow(image[H_half:H_half*2,0:W_half,...],0.5)
+    d=rgb_exclusion(image[H_half:H_half*2,W_half:W_half*2,...],'R')
+    Top=np.concatenate((a,b), axis=1)
+    Bottom=np.concatenate((c,d), axis=1)
+    out=np.concatenate((Top, Bottom), axis=0)
+    
     ### END YOUR CODE
 
     return out
