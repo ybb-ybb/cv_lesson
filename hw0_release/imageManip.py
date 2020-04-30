@@ -110,9 +110,10 @@ def lab_decomposition(image, channel):
     out = None
 
     ### YOUR CODE HERE
-    a={'L':[1,2],'A':[0,2],'B':[0,1]}
+    a={'L':0,'A':1,'B':2}
     out=np.zeros(image.shape)
-    out[:,:,a[channel]]=image[:,:,a[channel]]
+    out[:,:,a[channel]]=lab[:,:,a[channel]]
+    out=color.lab2rgb(out)
     ### END YOUR CODE
 
     return out
@@ -133,9 +134,10 @@ def hsv_decomposition(image, channel='H'):
     out = None
 
     ### YOUR CODE HERE
-    a={'H':[1,2],'S':[0,2],'V':[0,1]}
+    a={'H':0,'S':1,'V':2}
     out=np.zeros(image.shape)
-    out[:,:,a[channel]]=image[:,:,a[channel]]
+    out[:,:,a[channel]]=hsv[:,:,a[channel]]
+    out=color.hsv2rgb(out)
     ### END YOUR CODE
 
     return out
