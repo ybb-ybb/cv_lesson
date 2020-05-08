@@ -44,7 +44,11 @@ def harris_corners(img, window_size=3, k=0.04):
     dy = filters.sobel_h(img)
 
     ### YOUR CODE HERE
-    pass
+    (dx2, dy2, dxdy) = (dx ** 2, dy ** 2, dx * dy)
+    mx2 = convolve(dx2, window, mode='constant')
+    my2 = convolve(dy2, window, mode='constant')
+    mxy = convolve(dxdy, window, mode='constant')
+    response = (mx2 * my2 - mxy ** 2) - k * (mx2 + my2) ** 2
     ### END YOUR CODE
 
     return response
@@ -70,7 +74,10 @@ def simple_descriptor(patch):
     """
     feature = []
     ### YOUR CODE HERE
-    pass
+    mean = np.mean(patch)
+    std = np.std(patch)
+    std = std if std else 1
+    feature = ((patch - mean) / std).reshape(-1)
     ### END YOUR CODE
     return feature
 
@@ -93,8 +100,8 @@ def describe_keypoints(image, keypoints, desc_func, patch_size=16):
 
     for i, kp in enumerate(keypoints):
         y, x = kp
-        patch = image[y-(patch_size//2):y+((patch_size+1)//2),
-                      x-(patch_size//2):x+((patch_size+1)//2)]
+        patch = image[y - (patch_size // 2):y + ((patch_size + 1) // 2),
+                x - (patch_size // 2):x + ((patch_size + 1) // 2)]
         desc.append(desc_func(patch))
     return np.array(desc)
 
@@ -123,7 +130,9 @@ def match_descriptors(desc1, desc2, threshold=0.5):
     dists = cdist(desc1, desc2)
 
     ### YOUR CODE HERE
-    pass
+    matches = np.hstack([np.arange(N).reshape(-1, 1), np.argmin(dists, axis=1).reshape(-1, 1)])
+    d = np.sort(dists, axis=1)
+    matches = matches[d[:, 0] / d[:, 1] < threshold]
     ### END YOUR CODE
 
     return matches
@@ -143,18 +152,18 @@ def fit_affine_matrix(p1, p2):
         H: a matrix of shape (P, P) that transform p2 to p1.
     """
 
-    assert (p1.shape[0] == p2.shape[0]),\
+    assert (p1.shape[0] == p2.shape[0]), \
         'Different number of points in p1 and p2'
     p1 = pad(p1)
     p2 = pad(p2)
 
     ### YOUR CODE HERE
-    pass
+    H = np.linalg.lstsq(p2, p1, rcond=None)[0]
     ### END YOUR CODE
 
     # Sometimes numerical issues cause least-squares to produce the last
     # column which is not exactly [0, 0, 1]
-    H[:,2] = np.array([0, 0, 1])
+    H[:, 2] = np.array([0, 0, 1])
     return H
 
 
@@ -188,21 +197,31 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
     print(N)
     n_samples = int(N * 0.2)
 
-    matched1 = pad(keypoints1[matches[:,0]])
-    matched2 = pad(keypoints2[matches[:,1]])
+    matched1 = pad(keypoints1[matches[:, 0]])
+    matched2 = pad(keypoints2[matches[:, 1]])
 
     max_inliers = np.zeros(N)
     n_inliers = 0
 
     # RANSAC iteration start
     ### YOUR CODE HERE
-    pass
+    for i in range(n_iters):
+        indices = np.random.choice(N, n_samples)
+        s1, s2 = matched1[indices], matched2[indices]
+        H = np.linalg.lstsq(s2, s1, rcond=None)[0]
+        H[:, 2] = np.array([0, 0, 1])
+        curr_inliers = np.sqrt(((matched2.dot(H) - matched1) ** 2).sum(axis=-1)) < threshold
+        curr_n_inliers = curr_inliers.sum()
+        if curr_n_inliers > n_inliers:
+            max_inliers, n_inliers = curr_inliers, curr_n_inliers
+    H = np.linalg.lstsq(matched2[max_inliers], matched1[max_inliers], rcond=None)[0]
+    H[:, 2] = np.array([0, 0, 1])
     ### END YOUR CODE
     print(H)
     return H, orig_matches[max_inliers]
 
 
-def hog_descriptor(patch, pixels_per_cell=(8,8)):
+def hog_descriptor(patch, pixels_per_cell=(8, 8)):
     """
     Generating hog descriptor by the following steps:
 
@@ -220,10 +239,10 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
     Returns:
         block: 1D patch descriptor array of shape ((H*W*n_bins)/(M*N))
     """
-    assert (patch.shape[0] % pixels_per_cell[0] == 0),\
-                'Heights of patch and cell do not match'
-    assert (patch.shape[1] % pixels_per_cell[1] == 0),\
-                'Widths of patch and cell do not match'
+    assert (patch.shape[0] % pixels_per_cell[0] == 0), \
+        'Heights of patch and cell do not match'
+    assert (patch.shape[1] % pixels_per_cell[1] == 0), \
+        'Widths of patch and cell do not match'
 
     n_bins = 9
     degrees_per_bin = 180 // n_bins
@@ -232,7 +251,7 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
     Gy = filters.sobel_h(patch)
 
     # Unsigned gradients
-    G = np.sqrt(Gx**2 + Gy**2)
+    G = np.sqrt(Gx ** 2 + Gy ** 2)
     theta = (np.arctan2(Gy, Gx) * 180 / np.pi) % 180
 
     # Group entries of G and theta into cells of shape pixels_per_cell, (M, N)
@@ -248,8 +267,18 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
 
     # Compute histogram per cell
     ### YOUR CODE HERE
-    pass
-    ### YOUR CODE HERE
+    lower_bins = ((theta_cells // degrees_per_bin - (
+            theta_cells % degrees_per_bin <= degrees_per_bin / 2)) % n_bins).astype(int)
+    upper_bins = ((lower_bins + 1) % n_bins).astype(int)
+    lower_weights = ((degrees_per_bin / 2 - theta_cells % degrees_per_bin) % degrees_per_bin) / degrees_per_bin
+    upper_weights = 1 - lower_weights
+    indices = np.indices((rows, cols, pixels_per_cell[0], pixels_per_cell[1]))
+    i, j = indices[0].reshape(-1), indices[1].reshape(-1)
+    np.add.at(cells, (i, j, lower_bins.reshape(-1)), (lower_weights * G_cells).reshape(-1))
+    np.add.at(cells, (i, j, upper_bins.reshape(-1)), (upper_weights * G_cells).reshape(-1))
+    block = cells.reshape(-1)
+    block /= np.linalg.norm(block)
+    ### YOUR CODE HER
 
     return block
 
@@ -271,20 +300,28 @@ def linear_blend(img1_warped, img2_warped):
     Returns:
         merged: Merged image in output space
     """
-    out_H, out_W = img1_warped.shape # Height and width of output space
+    out_H, out_W = img1_warped.shape  # Height and width of output space
     img1_mask = (img1_warped != 0)  # Mask == 1 inside the image
     img2_mask = (img2_warped != 0)  # Mask == 1 inside the image
 
     # Find column of middle row where warped image 1 ends
     # This is where to end weight mask for warped image 1
-    right_margin = out_W - np.argmax(np.fliplr(img1_mask)[out_H//2, :].reshape(1, out_W), 1)[0]
+    right_margin = out_W - np.argmax(np.fliplr(img1_mask)[out_H // 2, :].reshape(1, out_W), 1)[0]
 
     # Find column of middle row where warped image 2 starts
     # This is where to start weight mask for warped image 2
-    left_margin = np.argmax(img2_mask[out_H//2, :].reshape(1, out_W), 1)[0]
+    left_margin = np.argmax(img2_mask[out_H // 2, :].reshape(1, out_W), 1)[0]
 
     ### YOUR CODE HERE
-    pass
+    weight1 = np.ones_like(img1_warped)
+    weight2 = np.ones_like(img2_warped)
+    if left_margin < right_margin:
+        n = right_margin - left_margin + 1
+        weight1[:, left_margin:right_margin + 1] = np.linspace(1, 0, n)
+        weight2[:, left_margin:right_margin + 1] = np.linspace(0, 1, n)
+    merged = weight1 * img1_warped + weight2 * img2_warped
+    overlap = img1_mask + img2_mask
+    merged /= np.maximum(overlap, 1)
     ### END YOUR CODE
 
     return merged
@@ -319,13 +356,26 @@ def stitch_multiple_images(imgs, desc_func=simple_descriptor, patch_size=5):
         descriptors.append(desc)
     # Match keypoints in neighboring images
     matches = []  # matches[i] corresponds to matches between
-                  # descriptors[i] and descriptors[i+1]
-    for i in range(len(imgs)-1):
-        mtchs = match_descriptors(descriptors[i], descriptors[i+1], 0.7)
+    # descriptors[i] and descriptors[i+1]
+    for i in range(len(imgs) - 1):
+        mtchs = match_descriptors(descriptors[i], descriptors[i + 1], 0.7)
         matches.append(mtchs)
 
     ### YOUR CODE HERE
-    pass
+    Hs = [np.eye(3)]
+    for i in range(len(imgs) - 1):
+        Hs.append(ransac(keypoints[i], keypoints[i + 1], matches[i], threshold=1)[0])
+    for i in range(1, len(imgs)):
+        Hs[i] = Hs[i].dot(Hs[i - 1])
+    output_shape, offset = get_output_space(imgs[0], imgs[1:], Hs[1:])
+    imgs_warped = []
+    for i in range(len(imgs)):
+        imgs_warped.append(warp_image(imgs[i], Hs[i], output_shape, offset))
+        img_mask = (imgs_warped[-1] != -1)
+        imgs_warped[-1][~img_mask] = 0
+    panorama = imgs_warped[0]
+    for i in range(1, len(imgs)):
+        panorama = linear_blend(panorama, imgs_warped[i])
     ### END YOUR CODE
 
     return panorama
