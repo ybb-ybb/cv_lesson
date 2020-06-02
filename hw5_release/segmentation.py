@@ -12,6 +12,7 @@ import random
 from scipy.spatial.distance import squareform, pdist
 from skimage.util import img_as_float
 
+
 ### Clustering Methods
 def kmeans(features, k, num_iters=100):
     """ Use kmeans algorithm to group features into k clusters.
@@ -45,10 +46,15 @@ def kmeans(features, k, num_iters=100):
 
     for n in range(num_iters):
         ### YOUR CODE HERE
-        pass
+        for i in range(N):
+            assignments[i] = np.argmin(((features[i] - centers) ** 2).mean(axis=-1))
+        a = np.eye(k)[assignments]
+        a /= a.sum(axis=0)
+        centers = a.T.dot(features)
         ### END YOUR CODE
 
     return assignments
+
 
 def kmeans_fast(features, k, num_iters=100):
     """ Use kmeans algorithm to group features into k clusters.
@@ -81,11 +87,14 @@ def kmeans_fast(features, k, num_iters=100):
 
     for n in range(num_iters):
         ### YOUR CODE HERE
-        pass
+        d = ((features.reshape(N, 1, D) - centers.reshape(1, k, D)) ** 2).sum(axis=-1)
+        assignments = np.argmin(d, axis=1)
+        a = np.eye(k)[assignments]
+        a /= a.sum(axis=0)
+        centers = a.T.dot(features)
         ### END YOUR CODE
 
     return assignments
-
 
 
 def hierarchical_clustering(features, k):
@@ -120,8 +129,6 @@ def hierarchical_clustering(features, k):
             (e.g. i-th point is assigned to cluster assignments[i])
     """
 
-
-
     N, D = features.shape
 
     assert N >= k, 'Number of clusters cannot be greater than number of points'
@@ -133,7 +140,17 @@ def hierarchical_clustering(features, k):
 
     while n_clusters > k:
         ### YOUR CODE HERE
-        pass
+        dists = ((centers.reshape(-1, 1, D) - centers.reshape(1, -1, D)) ** 2).sum(axis=-1)
+        np.fill_diagonal(dists, float('inf'))
+        i, j = np.unravel_index(np.argmin(dists), dists.shape)
+        if i > j:
+            i, j = j, i
+        assignments[assignments == j] = i
+        assignments[assignments == n_clusters - 1] = j
+        centers[i] = features[assignments == i].mean(axis=0)
+        centers[j] = centers[-1]
+        centers = centers[:-1]
+        n_clusters -= 1
         ### END YOUR CODE
 
     return assignments
@@ -151,13 +168,14 @@ def color_features(img):
     """
     H, W, C = img.shape
     img = img_as_float(img)
-    features = np.zeros((H*W, C))
+    features = np.zeros((H * W, C))
 
     ### YOUR CODE HERE
-    pass
+    features = img.reshape(-1, C)
     ### END YOUR CODE
 
     return features
+
 
 def color_position_features(img):
     """ Represents a pixel by its color and position.
@@ -180,13 +198,17 @@ def color_position_features(img):
     """
     H, W, C = img.shape
     color = img_as_float(img)
-    features = np.zeros((H*W, C+2))
+    features = np.zeros((H * W, C + 2))
 
     ### YOUR CODE HERE
-    pass
+    features[:, :C] = img.reshape(-1, C)
+    i, j = np.indices((H, W))
+    features[:, 3], features[:, 4] = i.reshape(-1), j.reshape(-1)
+    features = (features - features.mean(axis=0)) / features.std(axis=0)
     ### END YOUR CODE
 
     return features
+
 
 def my_features(img):
     """ Implement your own features
@@ -199,7 +221,12 @@ def my_features(img):
     """
     features = None
     ### YOUR CODE HERE
-    pass
+    H, W, C = img.shape
+    features = np.zeros((H * W, C * 2))
+    grad = np.gradient(img)[2]
+    features[:, :C] = img.reshape(-1, C)
+    features[:, C:] = grad.reshape(-1, C)
+    features = (features - features.mean(axis=0)) / features.std(axis=0)
     ### END YOUR CODE
     return features
 
@@ -223,10 +250,12 @@ def compute_accuracy(mask_gt, mask):
 
     accuracy = None
     ### YOUR CODE HERE
-    pass
+    H, W = mask_gt.shape
+    accuracy = np.sum(mask_gt == mask) / (H * W)
     ### END YOUR CODE
 
     return accuracy
+
 
 def evaluate_segmentation(mask_gt, segments):
     """ Compare the estimated segmentation with the ground truth.
