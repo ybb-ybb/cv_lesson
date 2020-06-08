@@ -19,11 +19,12 @@ def hog_feature(image, pixel_per_cell=8):
         pixel_per_cell: number of pixels in each cell, an argument for hog descriptor.
 
     Returns:
-        score: a vector of hog representation.
+        score: alvector of hog representation.
         hogImage: an image representation of hog provided by skimage.
     """
     ### YOUR CODE HERE
-    pass
+    hogFeature, hogImage = feature.hog(image, pixels_per_cell=(pixel_per_cell, pixel_per_cell), block_norm='L1',
+                                       visualise=True)
     ### END YOUR CODE
     return (hogFeature, hogImage)
 
@@ -62,7 +63,18 @@ def sliding_window(image, base_score, stepSize, windowSize, pixel_per_cell=8):
         mode='constant')
     response_map = np.zeros((H // stepSize + 1, W // stepSize + 1))
     ### YOUR CODE HERE
-    pass
+    for i in range(0, H + 1, stepSize):
+        for j in range(0, W + 1, stepSize):
+            score = feature.hog(
+                pad_image[i:i + winH, j:j + winW],
+                pixels_per_cell=(pixel_per_cell, pixel_per_cell),
+                block_norm='L1'
+            ).dot(base_score)
+            response_map[i // stepSize, j // stepSize] = score
+            if score > max_score:
+                max_score, maxr, maxc = score, i, j
+    maxr, maxc = maxr - winH // 2, maxc - winW // 2
+    response_map = resize(response_map, (H, W))
     ### END YOUR CODE
 
     return (max_score, maxr, maxc, response_map)
@@ -93,19 +105,24 @@ def pyramid(image, scale=0.9, minSize=(200, 100)):
     current_scale = 1.0
     images.append((current_scale, image))
 
+    # Use "break" to exit this loop if the next image will be smaller than
+    # the supplied minimium size
     while True:
-        # Use "break" to exit this loop if the next image will be smaller than
-        # the supplied minimium size
         ### YOUR CODE HERE
-        pass
-        ### END YOUR CODE
-
-        # Compute the new dimensions of the image and resize it
+        minH, minW = minSize
         current_scale *= scale
         image = rescale(image, scale)
-
-        # Yield the next image in the pyramid
         images.append((current_scale, image))
+        if image.shape[0] * scale <= minH or image.shape[1] * scale <= minW:
+            break
+        ### END YOUR CODE
+
+    # Compute the new dimensions of the image and resize it
+    current_scale *= scale
+    image = rescale(image, scale)
+
+    # Yield the next image in the pyramid
+    images.append((current_scale, image))
 
     return images
 
@@ -134,7 +151,10 @@ def pyramid_score(image, base_score, shape, stepSize=20,
     max_response_map = np.zeros(image.shape)
     images = pyramid(image, scale)
     ### YOUR CODE HERE
-    pass
+    for s, image in images:
+        score, r, c, response_map = sliding_window(image, base_score, stepSize, shape, pixel_per_cell)
+        if score > max_score:
+            max_score, maxr, maxc, max_scale, max_response_map = score, r, c, s, response_map
     ### END YOUR CODE
     return max_score, maxr, maxc, max_scale, max_response_map
 
@@ -160,7 +180,9 @@ def compute_displacement(part_centers, face_shape):
     """
     d = np.zeros((part_centers.shape[0], 2))
     ### YOUR CODE HERE
-    pass
+    d = np.array([face_shape[0] / 2, face_shape[1] / 2]) - part_centers
+    mu = d.mean(axis=0).astype(int)
+    sigma = d.std(axis=0)
     ### END YOUR CODE
     return mu, sigma
 
@@ -179,7 +201,8 @@ def shift_heatmap(heatmap, mu):
             new_heatmap: np array of (h,w).
     """
     ### YOUR CODE HERE
-    pass
+    heatmap /= np.max(heatmap)
+    new_heatmap = interpolation.shift(heatmap, mu)
     ### END YOUR CODE
     return new_heatmap
 
@@ -199,7 +222,10 @@ def gaussian_heatmap(heatmap_face, heatmaps, sigmas):
         new_image: an image np array of (h,w) after gaussian convoluted.
     """
     ### YOUR CODE HERE
-    pass
+    heatmap = heatmap_face.copy()
+    for h, sigma in zip(heatmaps, sigmas):
+        heatmap += gaussian(h, sigma)
+    r, c = np.unravel_index(np.argmax(heatmap), heatmap.shape)
     ### END YOUR CODE
     return heatmap, r, c
 
@@ -209,6 +235,11 @@ def detect_multiple(image, response_map):
     Extra credit
     """
     ### YOUR CODE HERE
-    pass
+    detected_faces = []
+    response = response_map.copy()
+    for num_face in range(4):
+        r, c = np.unravel_index(np.argmax(response), response_map.shape)
+        response[r - 70:r + 70, c - 60:c + 60] = 0
+        detected_faces.append((r, c))
     ### END YOUR CODE
     return detected_faces
