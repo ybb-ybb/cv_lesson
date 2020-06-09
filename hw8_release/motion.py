@@ -49,7 +49,11 @@ def lucas_kanade(img1, img2, keypoints, window_size=5):
         y, x = int(round(y)), int(round(x))
 
         ### YOUR CODE HERE
-        pass
+        y_i,x_i = max(y-w,0),max(x-w,0)
+        y_j,x_j=y+w+1,x+w+1
+        A=np.hstack((Ix[y_i:y_j,x_i:x_j].reshape(-1,1),Iy[y_i:y_j,x_i:x_j].reshape(-1,1)))
+        b=It[y_i:y_j,x_i:x_j].reshape(-1,1)
+        flow_vectors.append(np.linalg.lstsq(A,-b,rcond=None)[0].flatten())
         ### END YOUR CODE
 
     flow_vectors = np.array(flow_vectors)
@@ -168,7 +172,9 @@ def compute_error(patch1, patch2):
     assert patch1.shape == patch2.shape, 'Differnt patch shapes'
     error = 0
     ### YOUR CODE HERE
-    pass
+    patch1 = (patch1-np.mean(patch1)) / np.std(patch1)
+    patch2 = (patch2 - np.mean(patch2)) / np.std(patch2)
+    error = np.mean(np.square(patch1-patch2))
     ### END YOUR CODE
     return error
 
